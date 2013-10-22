@@ -1,5 +1,0 @@
-default['opencms']['url'] = "http://www.opencms.jp/modules/files/opencms_8.5.2ja.zip"
-default['opencms']['base_dir'] = "/ROOT/WEB-INF"
-  
-default['mysql/server_root_password'] = ""
-

@@ -1,3 +1,0 @@
-login "Admin" "admin"
-   rebuildIndex "Solr Offline"
-exit

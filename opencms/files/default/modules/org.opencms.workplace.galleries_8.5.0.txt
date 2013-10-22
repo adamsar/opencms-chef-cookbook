@@ -1,4 +1,0 @@
-login "Admin" "admin"
-setCurrentProject "Offline"
-importModule "packages/modules/org.opencms.workplace.galleries_8.5.0.zip"
-exit

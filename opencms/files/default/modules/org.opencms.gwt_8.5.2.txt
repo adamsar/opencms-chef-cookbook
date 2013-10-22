@@ -1,4 +1,0 @@
-login "Admin" "admin"
-setCurrentProject "Offline"
-importModule "packages/modules/org.opencms.gwt_8.5.2.zip"
-exit
