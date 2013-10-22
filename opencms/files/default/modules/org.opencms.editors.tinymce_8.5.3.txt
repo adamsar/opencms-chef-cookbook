@@ -1,0 +1,4 @@
+login "Admin" "admin"
+setCurrentProject "Offline"
+importModule "packages/modules/org.opencms.editors.tinymce_8.5.3.zip"
+exit

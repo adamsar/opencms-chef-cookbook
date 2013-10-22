@@ -1,0 +1,15 @@
+name             'opencms'
+maintainer       'Ubicast'
+maintainer_email 'a_adams@ubicast.com'
+license          'All rights reserved'
+description      'Installs/Configures the latest version of opencms'
+long_description IO.read(File.join(File.dirname(__FILE__), 'README.md'))
+version          '0.1.0'
+
+recipe "opencms", "Installs opencms on a tomcat installation"
+recipe "opencms:japanese": "Installs the Japanese localized version of Opencms on a tomcat instance"
+
+%w{ tomcat, java, mysql }.each do |pkg|
+  depends pkg
+end
+

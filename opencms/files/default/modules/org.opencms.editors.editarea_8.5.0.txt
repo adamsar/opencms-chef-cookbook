@@ -1,0 +1,4 @@
+login "Admin" "admin"
+setCurrentProject "Offline"
+importModule "packages/modules/org.opencms.editors.editarea_8.5.0.zip"
+exit

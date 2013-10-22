@@ -1,0 +1,82 @@
+#
+# Cookbook Name:: opencms
+# Recipe:: default
+#
+# Copyright 2013, YOUR_COMPANY_NAME
+#
+# All rights reserved - Do Not Redistribute
+#
+
+#Delete the tomcat administrator webapp
+service "tomcat" do
+  action :stop
+end
+
+directory "#{node['tomcat']['webapp_dir']}/ROOT" do
+  action :delete
+  recursive true
+end
+
+file "#{node['tomcat']['webapp_dir']}/ROOT.war" do
+  action :delete
+end  
+
+package "unzip" do
+  action :install
+end
+
+remote_file "#{node['tomcat']['webapp_dir']}/opencms.zip"  do
+  source node['opencms']['url']
+end
+
+bash "unzip_opencms" do
+  cwd node['tomcat']['webapp_dir']
+  code <<-EOH
+  unzip opencms.zip
+  mv *.war ROOT.war
+  EOH
+  timeout 200
+end
+
+service "tomcat" do
+  action :start
+end
+
+bash "wait_a_bit" do
+  code "sleep 10"
+end
+
+#Copy over the correct opencms files
+cookbook_file "#{node['tomcat']['webapp_dir']}#{node['opencms']['base_dir']}/config/opencms.properies" do
+  source "opencms.properties"
+end
+
+cookbook_file "#{node['tomcat']['webapp_dir']}#{node['opencms']['base_dir']}/setupdata/cmssetup.txt" do
+  source "cmssetup.txt"
+end
+
+cookbook_file "#{node['tomcat']['webapp_dir']}#{node['opencms']['base_dir']}/cmsshell.sh" do
+  source "cmsshell.sh"
+end
+
+cookbook_file "#{node['tomcat']['webapp_dir']}#{node['opencms']['base_dir']}/create_database.sql" do
+  source "create_database.sql"
+end
+
+cookbook_file "#{node['tomcat']['webapp_dir']}#{node['opencms']['base_dir']}/populate_db.sql" do
+  source "bootstrap.sql"
+end
+
+bash "populate_db" do
+  cwd "#{node['tomcat']['webapp_dir']}#{node['opencms']['base_dir']}"
+  code <<-EOH
+  mysql -u root < create_database.sql
+  mysql -u root opencms < populate_db.sql
+  EOH
+end
+
+#Actually install opencms
+bash "install_opencms" do
+  cwd "#{node['tomcat']['webapp_dir']}#{node['opencms']['base_dir']}"
+  code "sh cmsshell.sh -script=setupdata/cmssetup.txt"
+end

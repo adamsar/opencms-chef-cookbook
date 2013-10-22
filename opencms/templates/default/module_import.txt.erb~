@@ -1,0 +1,4 @@
+login "Admin" "admin"
+  setCurrentProject "Offline"
+  importModule <%= module %>
+exit
