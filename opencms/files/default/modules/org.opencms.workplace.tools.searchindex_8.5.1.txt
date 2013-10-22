@@ -1,0 +1,4 @@
+login "Admin" "admin"
+setCurrentProject "Offline"
+importModule "packages/modules/org.opencms.workplace.tools.searchindex_8.5.1.zip"
+exit
