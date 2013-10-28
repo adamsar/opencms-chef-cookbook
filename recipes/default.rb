@@ -51,7 +51,7 @@ bash "unzip_opencms" do
   EOH
   timeout 60*2 #Two minutes to unzip
   creates "#{tbase}/ROOT"
-  notifies :restart, "service[tomcat]"
+  notifies :restart, "service[tomcat]", :immediately
 end
 
 bash "wait_for_tomcat_to_unpackage" do
