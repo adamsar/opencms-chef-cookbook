@@ -4,7 +4,7 @@
 #
 # Copyright 2013, Andrew Adams
 #
-# All rights reserved - Do Not Redistribute
+# All rights reserved - Please redistribute
 #
 
 #Delete the tomcat administrator webapp
@@ -171,7 +171,7 @@ end
 directory obase do
   owner tuser
   group tgroup
-  mode "0644"
+  mode standard_mode
   recursive true
   action :nothing
 end
@@ -185,7 +185,7 @@ template "#{node['tomcat']['base']}/conf" do
   source "server.xml.erb"
   owner tuser
   group tgroup
-  mode "0644"
+  mode standard_mode
 end  
 
 #restart and enjoy. Serves 1 (http server)
