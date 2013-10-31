@@ -7,29 +7,23 @@
 # All rights reserved - Please redistribute
 #
 
-#Delete the tomcat administrator webapp
-service "tomcat" do
-  action :stop
+#Reusable vars for the app
+webapp_dir = node['tomcat']['webapp_dir']
+tomcat_user = node['tomcat']['user']
+tomcat_group = node['tomcat']['group']
+
+#Get rid of the manager directory and WAr
+#Opencms will run as ROOT
+file "#{webapp_dir}/ROOT.war" do
+  action :delete
 end
 
-#Reusable vars for the app
-tbase = node['tomcat']['webapp_dir']
-obase = "#{tbase}/ROOT/WEB-INF"
-tuser = node['tomcat']['user']
-tgroup = node['tomcat']['group']
-standard_mode = "0664"
-
-#Get rid of the manager, etc
-directory "#{tbase}/ROOT" do
+directory "#{webapp_dir}/ROOT" do
   action :delete
   recursive true
   not_if do
-    File.exists?("#{tbase}/opencms.zip")
+    File.exists?("#{webapp_dir}/opencms.zip")
   end
-end
-
-file "#{tbase}/ROOT.war" do
-  action :delete
 end
 
 #We need unzip to use opencms.zip
@@ -37,176 +31,135 @@ package "unzip" do
   action :install
 end
 
-remote_file "#{tbase}/opencms.zip"  do
+opencms_zip = "#{webapp_dir}/opencms.zip"
+remote_file opencms_zip  do
   source node['opencms']['url']
-  owner tuser
-  group tgroup
-  mode standard_mode
+  owner tomcat_user
+  group tomcat_group
+  mode opencms_standard_mode
   action :create_if_missing
 end
 
+file opencms_zip do  
+  action :nothing
+end
+
+#Unzip the file, rename to root notify tomcat if it
+#wasn't present 
 bash "unzip_opencms" do
-  cwd tbase
-  user tuser
+  cwd webapp_dir
+  user tomcat_user
   code <<-EOH
     unzip opencms.zip
     mv *.war ROOT.war
   EOH
-  timeout 60*2 #Two minutes to unzip
-  creates "#{tbase}/ROOT"
+  timeout 60 * 2 #Two minutes to unzip
+  creates "#{webapp_dir}/ROOT"
   notifies :restart, "service[tomcat]", :immediately
+  notifies :delete, "file[#{opencms_zip}]"
   not_if do
-    File.exists?("#{obase}/config/opencms.properties")
+    File.exists?("#{opencms_base_dir}/config/opencms.properties")
   end
 end
 
+#We may need to wait on slower systems for tomcat
+#to unpackage the war
 bash "wait_for_tomcat_to_unpackage" do
   code "sleep 5"
 end
 
-#Copy over the correct opencms files
-template "#{tbase}#{node['opencms']['base_dir']}/config/opencms.properties" do
-  owner tuser
-  group tgroup
-  mode standard_mode
+#Copy over the correct opencms files.
+#opencms.properties for property Mysql config
+template "#{opencms_base_dir}/config/opencms.properties" do
+  owner tomcat_user
+  group tomcat_group
+  mode opencms_standard_mode
   source "opencms.properties.erb"
 end
 
-template "#{tbase}#{node['opencms']['base_dir']}/cmsshell.sh" do
-  owner tuser
-  group tgroup
-  mode standard_mode
+#linux friendly cmsshell.sh
+template "#{opencms_base_dir}/cmsshell.sh" do
+  owner tomcat_user
+  group tomcat_group
+  mode opencms_standard_mode
   source "cmsshell.sh.erb"
 end
 
 #Create the database for use
-cookbook_file "#{obase}/create_database.sql" do
-  owner tuser
-  group tgroup
-  mode standard_mode
+cookbook_file "#{opencms_base_dir}/create_database.sql" do
+  owner tomcat_user
+  group tomcat_group
+  mode opencms_standard_mode
   source "create_database.sql"
 end
 
-bash "create_database" do
-  user tuser
-  cwd obase
-  code "mysql -u root --password='#{node['mysql']['server_root_password']}' < create_database.sql"
-end
+#Initialize the database
+run_opencms_sql("create_database.sql", "")
+run_opencms_sql("bootstrap.sql", "opencms")
 
-cookbook_file "#{obase}/bootstrap.sql" do  
-  owner tuser
-  group tgroup
-  mode standard_mode
-  source "bootstrap.sql"
-end
-
-bash "create_tables" do
-  user tuser
-  cwd obase
-  code "mysql -u root --password='#{node['mysql']['server_root_password']}' opencms < bootstrap.sql"
-end
-
-bootstrap_file = "#{obase}/setupdata/bootstrap.txt"
-do_bootstrap = !File.exists?(bootstrap_file)
-cookbook_file bootstrap_file do
-  owner tuser
-  group tgroup
-  mode standard_mode
+#Copy and run bootstrap CMS data scripts
+cookbook_file "#{opencms_base_dir}/setupdata/cmssetup_bootstrap.txt" do
+  owner tomcat_user
+  group tomcat_group
+  mode opencms_standard_mode
   source "cmssetup_bootstrap.txt"
-  not_if !do_bootstrap
 end
+run_opencms_script("setupdata/cmssetup_bootstrap.txt")
 
+#Install all the base modules 
+node['opencms']['modules'].each { |mod| install_opencms_module(mod) }
 
-cookbook_file "#{tbase}#{node['opencms']['base_dir']}/setupdata/cmssetup_solr.txt" do
-  owner tuser
-  group tgroup
-  mode standard_mode
-  source "cmssetup_solr.txt"
-  not_if !do_bootstrap
-end
-
-cookbook_file "#{tbase}#{node['opencms']['base_dir']}/setupdata/cmssetup_solr_online.txt" do
-  owner tuser
-  group tgroup
-  mode standard_mode
-  source "cmssetup_solr_online.txt"
-  not_if !do_bootstrap
-end
-
-bash "install_cms_bootstrap" do
-  user tuser
-  cwd obase
-  code "sh cmsshell.sh -script=setupdata/bootstrap.txt"
-  not_if !do_bootstrap
-end
-
-if do_bootstrap then
-  node['opencms']['modules'].each do |mod|
-
-    cookbook_file "#{obase}/setupdata/#{mod}.txt" do
-      owner tuser
-      group tgroup
-      mode standard_mode
-      source "modules/#{mod}.txt"
-    end
-    
-    bash "install_#{mod}" do
-      user "root"
-      cwd obase
-      code "sh cmsshell.sh -script=setupdata/#{mod}.txt"
-    end
-    
+#Publish everything to Solr
+["cmssetup_solr.txt", "cmssetup_solr_online.txt"].each do |script|
+  cookbook_file "#{opencms_base_dir}/setupdata/#{script}" do
+    owner tomcat_user
+    group tomcat_group
+    mode opencms_standard_mode
+    source script
   end
+  run_opencms_script("setupdata/#{script}")
 end
 
-
-bash "index_to_solr_offline" do
-  user tuser
-  cwd "#{tbase}#{node['opencms']['base_dir']}"
-  code "sh cmsshell.sh -script=setupdata/cmssetup_solr.txt"
-  not_if !do_bootstrap
-end
-
-bash "index_to_solr_online" do
-  user tuser
-  cwd "#{tbase}#{node['opencms']['base_dir']}"
-  code "sh cmsshell.sh -script=setupdata/cmssetup_solr_online.txt"
-  not_if !do_bootstrap
-end
-
-#configure opencms
-template "#{tbase}/ROOT/WEB-INF/config/opencms-importexport.xml" do
-  owner tuser
-  group tgroup
-  mode standard_mode
+#Configure opencms for the current server
+template "#{opencms_base_dir}/config/opencms-importexport.xml" do
+  owner tomcat_user
+  group tomcat_group
+  mode opencms_standard_mode
   source "opencms-importexport.xml.erb"
 end
 
-template "#{tbase}/ROOT/WEB-INF/config/opencms-system.xml" do
-  owner tuser
-  group tgroup
-  mode standard_mode
+template "#{opencms_base_dir}/config/opencms-system.xml" do
+  owner tomcat_user
+  group tomcat_group
+  mode opencms_standard_mode
   source "opencms-system.xml.erb"
 end
 
 #Make sure tomcat owns its folder
-directory obase do
-  owner tuser
-  group tgroup
-  mode standard_mode
+directory opencms_base_dir do
+  owner tomcat_user
+  group tomcat_group
+  mode opencms_standard_mode
   recursive true
   action :nothing
 end
 
-template "#{node['nginx']['dir']}/sites-enabled/server.conf" do
+#Update nginx with proper config
+template "#{node['nginx']['dir']}/sites-available/opencms.conf" do
   source "nginx.config.erb"
-  notifies :restart, "service[nginx]"
 end
 
+bash "link_to_sites_available" do
+  cwd node['nginx']['dir']
+  code "ln -s sites-available/opencms.conf sites-enabled/"
+  notifies :restart, "service[nginx]"  
+end
+
+#Update Tomcat to have the right proxy information and restart
 template "#{node['tomcat']['base']}/conf/server.xml" do
   source "server.xml.erb"
-  owner tuser
-  group tgroup
-  mode standard_mode
+  owner tomcat_user
+  group tomcat_group
+  mode opencms_standard_mode
   notifies :restart, "service[tomcat]"
 end

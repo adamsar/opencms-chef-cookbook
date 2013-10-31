@@ -1,6 +1,8 @@
 default['opencms']['url'] = "http://www.opencms.jp/modules/files/opencms_8.5.2ja.zip"
 default['opencms']['base_dir'] = "/ROOT/WEB-INF"
 default['opencms']['hostname'] = node.has_key?("ec2")?node['ec2']['public_hostname']:node['hostname']
+default['opencms']['database'] = 'opencms'
+default['opencms']['standard_mode'] = "0644"
 
 default['opencms']['modules'] = [
                                  "org.opencms.workplace_8.5.2",

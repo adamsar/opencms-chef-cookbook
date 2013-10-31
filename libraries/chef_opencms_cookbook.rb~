@@ -1,0 +1,10 @@
+class Chef
+  module OpencmsCookbook
+    
+    def self.install_module(file_name)
+      #Installs a module with the given file name
+      cookbook_file #{node['tomcat'
+    end
+    
+  end
+end
