@@ -63,14 +63,18 @@ module OpencmsCookbook
     #if the file exists on the node, then it has also
     #been run. So only run this if the file is not
     #present
-    cookbook_file "#{opencms_base_dir}/#{install_script}" do
+    template "#{opencms_base_dir}/#{install_script}" do
+      cookbook "opencms"
       owner node['tomcat']['user']
       group node['tomcat']['group']
       mode node['opencms']['standard_mode']
-      source "modules/#{file_name}.txt"
+      source "import_module.txt.erb"
       action :create
       notifies :run, "bash[cms_run_#{install_script}]", :immediately
       not_if { File.exists?("#{opencms_base_dir}/#{install_script}") }
+      variables({
+                  :mod => "#{file_name}.zip"
+                })
     end
 
   end

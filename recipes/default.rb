@@ -12,7 +12,8 @@ webapp_dir = node['tomcat']['webapp_dir']
 tomcat_user = node['tomcat']['user']
 tomcat_group = node['tomcat']['group']
 
-#Get rid of the manager directory and WAr
+
+#Get rid of the manager directory and War
 #Opencms will run as ROOT
 file "#{webapp_dir}/ROOT.war" do
   action :delete
