@@ -146,13 +146,8 @@ directory opencms_base_dir do
 end
 
 #Update nginx with proper config
-template "#{node['nginx']['dir']}/sites-available/opencms.conf" do
+template "#{node['nginx']['dir']}/sites-enabled/opencms.conf" do
   source "nginx.config.erb"
-end
-
-bash "link_to_sites_available" do
-  cwd node['nginx']['dir']
-  code "ln -s sites-available/opencms.conf sites-enabled/"
   notifies :restart, "service[nginx]"  
 end
 
